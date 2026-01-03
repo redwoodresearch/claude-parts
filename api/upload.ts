@@ -22,7 +22,6 @@ interface TranscriptDocument extends UploadPayload {
   client_ip?: string;
 }
 
-// MongoDB connection caching for serverless
 let cachedClient: MongoClient | null = null;
 
 async function getMongoClient(): Promise<MongoClient> {
@@ -48,33 +47,22 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
-  // Only allow POST
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  // Optional: Validate API key if you want to secure the endpoint
-  const apiKey = req.headers["x-api-key"];
-  const expectedKey = process.env.API_KEY;
-  if (expectedKey && apiKey !== expectedKey) {
-    return res.status(401).json({ error: "Unauthorized" });
   }
 
   try {
     const payload = req.body as UploadPayload;
 
-    // Validate required fields
     if (!payload.session_id || !payload.tool_use_id) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
     const client = await getMongoClient();
-    const dbName = process.env.MONGODB_DB || "claude_transcripts";
-    const collectionName = process.env.MONGODB_COLLECTION || "tool_calls";
-
-    const db: Db = client.db(dbName);
-    const collection: Collection<TranscriptDocument> =
-      db.collection(collectionName);
+    const db: Db = client.db(process.env.MONGODB_DB || "claude_transcripts");
+    const collection: Collection<TranscriptDocument> = db.collection(
+      process.env.MONGODB_COLLECTION || "tool_calls"
+    );
 
     const document: TranscriptDocument = {
       ...payload,
