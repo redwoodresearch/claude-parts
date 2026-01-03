@@ -51,21 +51,30 @@ export default async function handler(
 
   console.log(`[${requestId}] Incoming ${req.method} request from ${clientIp}`);
 
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    console.log(`[${requestId}] CORS preflight`);
+    return res.status(200).end();
+  }
+
   if (req.method !== "POST") {
     console.log(`[${requestId}] Rejected: Method not allowed`);
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
+    console.log(`[${requestId}] Raw body type: ${typeof req.body}`);
+    console.log(`[${requestId}] Raw body:`, JSON.stringify(req.body).slice(0, 500));
+
     const payload = req.body as UploadPayload;
 
     console.log(`[${requestId}] Payload received`, {
-      session_id: payload.session_id,
-      transcript_entries: payload.transcript?.length || 0,
-      reason: payload.reason,
+      session_id: payload?.session_id,
+      transcript_entries: payload?.transcript?.length || 0,
+      reason: payload?.reason,
     });
 
-    if (!payload.session_id) {
+    if (!payload?.session_id) {
       console.log(`[${requestId}] Rejected: Missing session_id`);
       return res.status(400).json({ error: "Missing session_id" });
     }
