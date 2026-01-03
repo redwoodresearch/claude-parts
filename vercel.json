@@ -1,6 +1,6 @@
 {
   "buildCommand": "",
-  "outputDirectory": "",
+  "outputDirectory": "public",
   "functions": {
     "api/*.ts": {
       "memory": 256,
