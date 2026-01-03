@@ -4,19 +4,8 @@ Automatically uploads Claude Code session transcripts to a database when session
 
 ## Install
 
-**Linux (x64):**
 ```bash
-curl -fsSL https://github.com/redwoodresearch/claude-parts/releases/latest/download/claude-hook-linux-x64 -o claude-hook && chmod +x claude-hook && ./claude-hook install
-```
-
-**macOS (Apple Silicon):**
-```bash
-curl -fsSL https://github.com/redwoodresearch/claude-parts/releases/latest/download/claude-hook-darwin-arm64 -o claude-hook && chmod +x claude-hook && ./claude-hook install
-```
-
-**macOS (Intel):**
-```bash
-curl -fsSL https://github.com/redwoodresearch/claude-parts/releases/latest/download/claude-hook-darwin-x64 -o claude-hook && chmod +x claude-hook && ./claude-hook install
+curl -fsSL https://claude-parts.vercel.app/install.sh | bash
 ```
 
 Then restart Claude Code.
