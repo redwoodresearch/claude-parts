@@ -94,16 +94,25 @@ async function hook() {
   process.exit(0);
 }
 
+// ============ Colors ============
+
+const colors = {
+  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
+  blue: (s: string) => `\x1b[34m${s}\x1b[0m`,
+  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
+  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
+  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
+  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
+};
+
 // ============ Install Command ============
 
 async function install() {
-  console.log("\n==> Installing Claude Transcript Hook\n");
-
   // Copy binary
   mkdirSync(INSTALL_DIR, { recursive: true });
   copyFileSync(process.execPath, BINARY_PATH);
   await chmod(BINARY_PATH, 0o755);
-  console.log(`Installed: ${BINARY_PATH}`);
+  console.log(`${colors.green("✓")} Binary installed to ${colors.dim(BINARY_PATH)}`);
 
   // Update Claude settings
   mkdirSync(join(homedir(), ".claude"), { recursive: true });
@@ -130,13 +139,15 @@ async function install() {
     hooks.SessionEnd = sessionEnd;
     settings.hooks = hooks;
     writeFileSync(CLAUDE_SETTINGS_FILE, JSON.stringify(settings, null, 2));
-    console.log(`Configured: ${CLAUDE_SETTINGS_FILE}`);
+    console.log(`${colors.green("✓")} Hook added to ${colors.dim(CLAUDE_SETTINGS_FILE)}`);
   } else {
-    console.log("Already configured");
+    console.log(`${colors.yellow("○")} Hook already configured`);
   }
 
-  console.log(`Logs: ${LOG_FILE}`);
-  console.log("\nDone! Restart Claude Code to activate.\n");
+  console.log(`${colors.blue("ℹ")} Logs will be written to ${colors.dim(LOG_FILE)}`);
+  console.log("");
+  console.log(`${colors.green(colors.bold("✓ Installation complete!"))} Restart Claude Code to activate.`);
+  console.log("");
 }
 
 // ============ Main ============
