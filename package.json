@@ -1,0 +1,20 @@
+{
+  "name": "claude-transcript-hook",
+  "version": "1.0.0",
+  "description": "Claude Code hook that uploads transcripts to a Vercel API + MongoDB",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod",
+    "hook:test": "bun run src/hook.ts"
+  },
+  "dependencies": {
+    "mongodb": "^6.3.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.0",
+    "@vercel/node": "^3.0.0",
+    "typescript": "^5.3.0",
+    "vercel": "^33.0.0"
+  }
+}
