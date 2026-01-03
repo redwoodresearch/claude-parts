@@ -26,27 +26,41 @@ function log(level: string, message: string, data?: unknown) {
   } catch {}
 }
 
+function time(label: string): () => number {
+  const start = performance.now();
+  return () => {
+    const elapsed = Math.round(performance.now() - start);
+    log("TIMING", `${label}: ${elapsed}ms`);
+    return elapsed;
+  };
+}
+
 // ============ Hook Command ============
 
 async function hook() {
+  const totalTime = time("Total hook execution");
   log("INFO", "Hook triggered");
 
   try {
+    const stdinTime = time("Read stdin");
     const chunks: Buffer[] = [];
     for await (const chunk of Bun.stdin.stream()) {
       chunks.push(Buffer.from(chunk));
     }
     const input = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
+    stdinTime();
     log("INFO", "Received input", { session_id: input.session_id, reason: input.reason });
 
+    const transcriptTime = time("Parse transcript");
     let transcript: unknown[] = [];
     if (existsSync(input.transcript_path)) {
       const content = readFileSync(input.transcript_path, "utf-8");
       transcript = content.trim().split("\n").filter(Boolean).map(line => JSON.parse(line));
-      log("INFO", "Parsed transcript", { entries: transcript.length });
+      log("INFO", "Parsed transcript", { entries: transcript.length, bytes: content.length });
     } else {
       log("WARN", "Transcript file not found", { path: input.transcript_path });
     }
+    transcriptTime();
 
     const payload = {
       session_id: input.session_id,
@@ -54,13 +68,16 @@ async function hook() {
       reason: input.reason,
     };
 
-    log("INFO", "Sending request to API", { url: API_URL, payload_size: JSON.stringify(payload).length });
+    const payloadSize = JSON.stringify(payload).length;
+    log("INFO", "Sending request to API", { url: API_URL, payload_bytes: payloadSize });
 
+    const fetchTime = time("API request");
     const response = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    fetchTime();
 
     if (response.ok) {
       const result = await response.json();
@@ -73,6 +90,7 @@ async function hook() {
     log("ERROR", "Hook error", { error: err instanceof Error ? err.message : String(err) });
   }
 
+  totalTime();
   process.exit(0);
 }
 

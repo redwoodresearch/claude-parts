@@ -20,25 +20,34 @@ interface TranscriptDocument extends UploadPayload {
 
 let cachedClient: MongoClient | null = null;
 
-async function getMongoClient(): Promise<MongoClient> {
+function time(requestId: string, label: string): () => void {
+  const start = Date.now();
+  return () => {
+    console.log(`[${requestId}] TIMING ${label}: ${Date.now() - start}ms`);
+  };
+}
+
+async function getMongoClient(requestId: string): Promise<MongoClient> {
   const uri = process.env.MONGODB_URI;
   if (!uri) {
     throw new Error("MONGODB_URI environment variable not set");
   }
 
   if (cachedClient) {
-    console.log("[MongoDB] Using cached connection");
+    console.log(`[${requestId}] MongoDB using cached connection`);
     return cachedClient;
   }
 
-  console.log("[MongoDB] Creating new connection");
+  const connectTime = time(requestId, "MongoDB connect");
+  console.log(`[${requestId}] MongoDB creating new connection`);
   cachedClient = new MongoClient(uri, {
     serverSelectionTimeoutMS: 5000,
     connectTimeoutMS: 5000,
   });
 
   await cachedClient.connect();
-  console.log("[MongoDB] Connected successfully");
+  connectTime();
+  console.log(`[${requestId}] MongoDB connected`);
   return cachedClient;
 }
 
@@ -46,41 +55,33 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
+  const totalTime = time("", "Total request");
   const requestId = Math.random().toString(36).substring(7);
   const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket?.remoteAddress || "unknown";
 
-  console.log(`[${requestId}] Incoming ${req.method} request from ${clientIp}`);
+  console.log(`[${requestId}] Incoming ${req.method} from ${clientIp}`);
 
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    console.log(`[${requestId}] CORS preflight`);
     return res.status(200).end();
   }
 
   if (req.method !== "POST") {
-    console.log(`[${requestId}] Rejected: Method not allowed`);
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
-    console.log(`[${requestId}] Raw body type: ${typeof req.body}`);
-    console.log(`[${requestId}] Raw body:`, JSON.stringify(req.body).slice(0, 500));
-
+    const parseTime = time(requestId, "Parse payload");
     const payload = req.body as UploadPayload;
+    parseTime();
 
-    console.log(`[${requestId}] Payload received`, {
-      session_id: payload?.session_id,
-      transcript_entries: payload?.transcript?.length || 0,
-      reason: payload?.reason,
-    });
+    console.log(`[${requestId}] Payload: session=${payload?.session_id}, entries=${payload?.transcript?.length || 0}, reason=${payload?.reason}`);
 
     if (!payload?.session_id) {
       console.log(`[${requestId}] Rejected: Missing session_id`);
       return res.status(400).json({ error: "Missing session_id" });
     }
 
-    console.log(`[${requestId}] Connecting to MongoDB`);
-    const client = await getMongoClient();
+    const client = await getMongoClient(requestId);
     const db: Db = client.db(process.env.MONGODB_DB || "claude_transcripts");
     const collection: Collection<TranscriptDocument> = db.collection(
       process.env.MONGODB_COLLECTION || "tool_calls"
@@ -92,9 +93,12 @@ export default async function handler(
       client_ip: clientIp,
     };
 
-    console.log(`[${requestId}] Inserting document`);
+    const insertTime = time(requestId, "MongoDB insert");
     const result = await collection.insertOne(document);
-    console.log(`[${requestId}] Insert successful`, { insertedId: result.insertedId.toString() });
+    insertTime();
+
+    console.log(`[${requestId}] Inserted: ${result.insertedId}`);
+    totalTime();
 
     return res.status(200).json({
       success: true,
@@ -102,6 +106,7 @@ export default async function handler(
     });
   } catch (error) {
     console.error(`[${requestId}] Error:`, error);
+    totalTime();
     return res.status(500).json({
       error: "Internal server error",
       message: error instanceof Error ? error.message : "Unknown error",
