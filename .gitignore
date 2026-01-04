@@ -4,3 +4,4 @@ dist/
 *.log
 .vercel/
 claude-hook
+.vercel
