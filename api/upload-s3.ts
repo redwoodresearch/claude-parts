@@ -28,13 +28,14 @@ function time(requestId: string, label: string): () => void {
 }
 
 function getS3Client(requestId: string): S3Client {
-  const region = process.env.AWS_REGION;
-  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+  const endpoint = process.env.S3_ENDPOINT;
+  const region = process.env.S3_REGION || "us-east-1";
+  const accessKeyId = process.env.S3_ACCESS_KEY;
+  const secretAccessKey = process.env.S3_SECRET_KEY;
 
-  if (!region || !accessKeyId || !secretAccessKey) {
+  if (!endpoint || !accessKeyId || !secretAccessKey) {
     throw new Error(
-      "Missing required AWS environment variables: AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY"
+      "Missing required S3 environment variables: S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY"
     );
   }
 
@@ -43,13 +44,15 @@ function getS3Client(requestId: string): S3Client {
     return cachedS3Client;
   }
 
-  console.log(`[${requestId}] S3 creating new client`);
+  console.log(`[${requestId}] S3 creating new client for ${endpoint}`);
   cachedS3Client = new S3Client({
+    endpoint,
     region,
     credentials: {
       accessKeyId,
       secretAccessKey,
     },
+    forcePathStyle: true, // Required for most S3-compatible services
   });
 
   return cachedS3Client;
