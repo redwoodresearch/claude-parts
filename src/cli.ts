@@ -11,6 +11,40 @@ const INSTALL_DIR = join(XDG_DATA_HOME, "claude-transcript-hook");
 const BINARY_PATH = join(INSTALL_DIR, "claude-hook");
 const LOG_FILE = join(INSTALL_DIR, "hook.log");
 const CLAUDE_SETTINGS_FILE = join(homedir(), ".claude", "settings.json");
+const CLAUDE_COMMANDS_DIR = join(homedir(), ".claude", "commands");
+
+// Per-project enable file - must exist in project's .claude folder to enable uploads
+const PROJECT_ENABLE_FILENAME = "upload-transcripts";
+
+// Slash command content
+const SLASH_COMMAND_CONTENT = `# Toggle Transcript Uploading
+
+This command toggles whether Claude Code session transcripts are uploaded to a central server for this project.
+
+## How it works
+
+- Transcript uploading is **per-project** - each project must be explicitly enabled
+- When enabled, a marker file is created at \`.claude/${PROJECT_ENABLE_FILENAME}\` in the project root
+- The SessionEnd hook checks for this file and only uploads if it exists
+
+## Instructions
+
+1. Check if uploading is currently enabled by looking for \`.claude/${PROJECT_ENABLE_FILENAME}\` in the project root
+2. If the file exists, uploading is ENABLED - ask if the user wants to disable it
+3. If the file does not exist, uploading is DISABLED - ask if the user wants to enable it
+
+### To ENABLE uploading:
+\`\`\`bash
+mkdir -p .claude && touch .claude/${PROJECT_ENABLE_FILENAME}
+\`\`\`
+
+### To DISABLE uploading:
+\`\`\`bash
+rm -f .claude/${PROJECT_ENABLE_FILENAME}
+\`\`\`
+
+Always confirm with the user before making changes and tell them the current status first.
+`;
 
 // ============ Logging ============
 
@@ -39,9 +73,21 @@ function time(label: string): () => number {
 
 async function hook() {
   const totalTime = time("Total hook execution");
-  log("INFO", "Hook triggered");
+  log("INFO", "Hook triggered", { cwd: process.cwd() });
 
   try {
+    // Check for per-project enable file
+    const projectEnableFile = join(process.cwd(), ".claude", PROJECT_ENABLE_FILENAME);
+    if (!existsSync(projectEnableFile)) {
+      log("INFO", "Skipping upload - project not enabled", {
+        expected_file: projectEnableFile,
+        hint: "Run /toggle-uploading-transcripts to enable"
+      });
+      totalTime();
+      process.exit(0);
+    }
+    log("INFO", "Project upload enabled", { enable_file: projectEnableFile });
+
     const stdinTime = time("Read stdin");
     const chunks: Buffer[] = [];
     for await (const chunk of Bun.stdin.stream()) {
@@ -114,6 +160,12 @@ async function install() {
   await chmod(BINARY_PATH, 0o755);
   console.log(`${colors.green("✓")} Binary installed to ${colors.dim(BINARY_PATH)}`);
 
+  // Install slash command
+  mkdirSync(CLAUDE_COMMANDS_DIR, { recursive: true });
+  const slashCommandPath = join(CLAUDE_COMMANDS_DIR, "toggle-uploading-transcripts.md");
+  writeFileSync(slashCommandPath, SLASH_COMMAND_CONTENT);
+  console.log(`${colors.green("✓")} Slash command installed to ${colors.dim(slashCommandPath)}`);
+
   // Update Claude settings
   mkdirSync(join(homedir(), ".claude"), { recursive: true });
 
@@ -147,6 +199,10 @@ async function install() {
   console.log(`${colors.blue("ℹ")} Logs will be written to ${colors.dim(LOG_FILE)}`);
   console.log("");
   console.log(`${colors.green(colors.bold("✓ Installation complete!"))} Restart Claude Code to activate.`);
+  console.log("");
+  console.log(`${colors.cyan("Per-project setup:")}`);
+  console.log(`  Transcripts are uploaded on a per-project basis.`);
+  console.log(`  Run ${colors.bold("/toggle-uploading-transcripts")} in any project to enable uploading.`);
   console.log("");
 }
 
